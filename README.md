@@ -1,6 +1,5 @@
 # AI DevOps Co-Pilot 🤖
-
-> **v0** — LLM-powered GitHub Actions failure analyser  
+  
 > Built with Java 17 · Spring Boot 3 · Spring AI · OpenAI GPT-4o-mini
 
 ## What it does
@@ -159,41 +158,8 @@ ai-devops-copilot/
 └── pom.xml
 ```
 
----
 
-## Roadmap
 
-| Version | What's coming |
-|---|---|
-| **v0** ✅ | LLM-powered CI/CD failure RCA via REST API |
-| **v1** | LangGraph-style agent loop — Prometheus alert → reason → suggest fix |
-| **v2** | Auto-remediation: restart pods, rollback deployments, trigger Ansible |
-| **v3** | Multi-agent: Analyst + Executor + Notifier (Slack/email) |
-| **v4** | Memory (Redis), PR security review, cost analysis |
-
----
-
-## LinkedIn post — v0 launch
-
-> **I built an AI agent that reads my CI/CD failures so I don't have to.**
->
-> As a Java/DevOps engineer I've spent hours staring at 3000-line pipeline logs trying to find the one line that broke everything.
->
-> So I built **AI DevOps Co-Pilot** — a Spring Boot service that:
-> ✅ Connects to your GitHub Actions via REST API
-> ✅ Pulls the raw logs from every failed job
-> ✅ Sends them to GPT-4o through Spring AI
-> ✅ Returns a clean JSON with: root cause, failed steps, severity, and a plain-English summary
->
-> Stack: Java 17 · Spring Boot 3 · Spring AI · OpenAI GPT-4o-mini · Docker
->
-> This is v0. The plan is to evolve it into a full multi-agent system that can not just *explain* failures but *fix* them autonomously.
->
-> GitHub link in the comments 👇
->
-> #Java #SpringBoot #SpringAI #DevOps #CI_CD #AIAgents #OpenAI #SoftwareEngineering #GitHub
-
----
 
 ## Security notes
 
@@ -436,13 +402,7 @@ git status          # .env should not appear
 git log --oneline   # should show your commit
 ```
 
----
 
-### Step 11: Post on LinkedIn
-
-Copy the draft from the bottom of README.md — it's in the **LinkedIn post** section. Attach a screenshot of the JSON response (blank out the run ID if it's a private repo). Put the GitHub link in the first comment.
-
----
 
 ### Full flow summary
 
@@ -466,79 +426,5 @@ Get structured RCA JSON  ✅
 git push → LinkedIn post
 ```
 
----
-
-### Common issues and fixes
-
-| Problem | Fix |
-|---|---|
-| `BUILD FAILURE` — cannot resolve `spring-ai` | The Spring Milestones repo is in `pom.xml` — run `mvn clean package` once connected to internet |
-| `401 Unauthorized` from GitHub | GitHub token expired or missing `Actions: Read` permission — regenerate it |
-| `401` from OpenAI | Wrong API key in `.env` — check for extra spaces or quotes |
-| `WebClient buffer limit exceeded` | Already handled — 16MB buffer is set in `AppConfig` |
-| `.env` showing in `git status` | Run `git rm --cached .env` then commit |
 
 
-
-
-
-
-
-POST /api/v1/analyze
-Body: { "repo_owner": "paridhi-garg", "repo_name": "my-spring-app" }
-
-  AnalysisController.analyze()
-    → validates "paridhi-garg" matches [a-zA-Z0-9_.-]+  ✅
-    → calls rcaService.analyze("paridhi-garg", "my-spring-app", null, "main")
-
-  RCAService.analyze()
-    → runId is null → calls getLatestFailedRun()
-
-  GitHubService.getLatestFailedRun()
-    → GET https://api.github.com/repos/paridhi-garg/my-spring-app/actions/runs
-           ?branch=main&status=failure&per_page=1
-    → Response: { "workflow_runs": [{ "id": 14523891, "name": "CI", "run_number": 47 ... }] }
-    → Returns WorkflowRun(id=14523891, name="CI", runNumber=47, conclusion="failure")
-
-  GitHubService.getJobsForRun(runId=14523891)
-    → GET /repos/paridhi-garg/my-spring-app/actions/runs/14523891/jobs
-    → Returns [Job(id=98765, name="build-and-test", conclusion="failure",
-                   steps=[Step("Checkout", "success"), Step("Run tests", "failure")])]
-
-  RCAService: failedJobNames = ["build-and-test"]
-
-  GitHubService.getFailedJobLogs(runId=14523891)
-    → getJobLogs(jobId=98765)
-        → GET /repos/paridhi-garg/my-spring-app/actions/jobs/98765/logs
-        → GitHub responds: HTTP 302
-          Location: https://objects.githubusercontent.com/logs/98765?X-Amz-Signature=xyz
-        → response.releaseBody() → discards empty 302 body
-        → plainWebClient.get("https://objects.githubusercontent.com/...") 
-        → Returns 2.3MB of raw log text
-    → Truncate to last 8,000 chars  
-    → Build: "=== JOB: build-and-test [failure] ===\n  FAILED STEP: Run tests\n<logs>"
-
-  RCAService: cap total logs to 15,000 chars
-
-  RCAService.callAI()
-    → Builds prompt with run metadata + truncated logs
-    → chatClient.prompt().user(prompt).call().content()
-    → OpenAI API receives ~3,500 tokens
-    → Returns:
-      {
-        "root_cause": "NullPointerException in UserServiceTest because UserRepository mock is not initialised.",
-        "failed_steps": ["Run tests"],
-        "recommendation": "Add @MockBean for UserRepository in UserServiceTest and initialise it in @BeforeEach.",
-        "severity": "HIGH",
-        "summary": "The CI pipeline failed in the test phase. A missing mock setup caused a NullPointerException in the user service tests. Add the missing @MockBean annotation and re-run."
-      }
-
-  RCAService.buildResponse()
-    → Strips any markdown fences
-    → objectMapper.readValue() → Map
-    → Builds AnalysisResponse via @Builder
-
-  AnalysisController
-    → ResponseEntity.ok(response)
-    → Jackson serializes to JSON
-    → HTTP 200 returned to caller
