@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: ai-devops-copilot
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-4o-mini
+          temperature: 0.1        # Low temperature for deterministic, precise analysis
+          max-tokens: 1024
+
+github:
+  token: ${GITHUB_TOKEN}
+  api:
+    base-url: https://api.github.com
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.paridhi.devopscopilot: INFO
+    org.springframework.ai: INFO
+    reactor.netty: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
